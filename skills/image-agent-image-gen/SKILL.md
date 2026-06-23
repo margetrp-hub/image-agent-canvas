@@ -22,6 +22,7 @@ The required generation capability is the built-in `$imagegen` skill from Codex.
    - Selected AI holder: generate to the holder's aspect ratio and insert into that holder.
    - Selected image or note: generate and insert to the right of the selected shape.
    - No selection: generate anyway and insert into the current page.
+   - When generating a revision from an existing image, call `create_canvas_branch` first unless a branch holder is already selected. Use the returned `branchShapeId` as the insertion target.
 
 3. Generate the bitmap with the built-in `$imagegen` skill unless the user explicitly requests another path.
 
@@ -43,6 +44,10 @@ The required generation capability is the built-in `$imagegen` skill from Codex.
 
 5. Insert the generated local image with `insert_canvas_image`.
 
+   - For a branch holder, pass `targetShapeId` or `anchorShapeId` equal to the returned `branchShapeId`.
+   - Pass the final generation prompt in `prompt`.
+   - Keep the returned `shapeId`; it should inherit `sourceShapeId`, `branchLabel`, `promptCardId`, and `arrowId` from the branch holder.
+
    The MCP tool copies the bitmap into:
 
    ```text
@@ -51,7 +56,7 @@ The required generation capability is the built-in `$imagegen` skill from Codex.
 
    and writes the tldraw image asset plus image shape into the running canvas snapshot.
 
-6. Let the canvas refresh from `/api/canvas-events`, then confirm the inserted shape id, dimensions, and saved asset path.
+6. Let the canvas refresh from `/api/canvas-events`, then call `read_canvas_layers` and confirm that the generated image links back to the source shape, branch label, prompt card, and arrow.
 
 ## Placement Rules
 

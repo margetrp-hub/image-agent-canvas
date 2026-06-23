@@ -545,7 +545,7 @@ function createGeoPromptCardRecord({
   };
 }
 
-function createArrowRecord({ store, parentId, sourceShapeId, targetShapeId, start, end, label }) {
+function createArrowRecord({ store, parentId, sourceShapeId, targetShapeId, start, end, label, meta = {} }) {
   const arrowId = uniqueRecordId(store, 'shape', `${sanitizeIdPart(sourceShapeId, 'source')}-to-${sanitizeIdPart(targetShapeId, 'target')}`);
   return {
     arrowId,
@@ -560,7 +560,8 @@ function createArrowRecord({ store, parentId, sourceShapeId, targetShapeId, star
         sourceShapeId,
         targetShapeId,
         branchLabel: label,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        ...meta
       },
       id: arrowId,
       type: 'arrow',
@@ -586,6 +587,23 @@ function createArrowRecord({ store, parentId, sourceShapeId, targetShapeId, star
       index: chooseIndex(store, parentId),
       typeName: 'shape'
     }
+  };
+}
+
+function lineageFromHolder(holderShape) {
+  if (!isAiImageHolder(holderShape) && holderShape?.meta?.imageAgentBranchNode !== true) return null;
+  const meta = holderShape.meta ?? {};
+  const sourceShapeId = nonEmptyString(meta.sourceShapeId) || nonEmptyString(meta.imageAgentSourceShapeId);
+  const branchLabel = nonEmptyString(meta.branchLabel) || nonEmptyString(meta.imageAgentBranchLabel);
+  if (!sourceShapeId && !branchLabel) return null;
+  return {
+    sourceShapeId,
+    holderShapeId: holderShape.id,
+    targetShapeId: holderShape.id,
+    branchLabel,
+    promptCardId: nonEmptyString(meta.promptCardId) || nonEmptyString(meta.imageAgentPromptCardId),
+    arrowId: nonEmptyString(meta.arrowId) || nonEmptyString(meta.imageAgentArrowId),
+    prompt: compactText(meta.prompt || '')
   };
 }
 
@@ -749,10 +767,12 @@ async function insertCanvasImage(args = {}) {
   const anchorShapeId =
     nonEmptyString(args.anchorShapeId) ||
     nonEmptyString(args.targetId) ||
+    nonEmptyString(args.targetShapeId) ||
     nonEmptyString(args.sourceShapeId) ||
     firstSelectedShapeId(selection);
   const anchorShape = anchorShapeId ? getRecord(store, anchorShapeId, 'anchor shape') : null;
   const holderAnchor = isAiImageHolder(anchorShape);
+  const holderLineage = holderAnchor ? lineageFromHolder(anchorShape) : null;
   const pageId =
     nonEmptyString(args.pageId) ||
     (anchorShape ? findPageIdForShape(store, anchorShape.id) : null) ||
@@ -809,14 +829,68 @@ async function insertCanvasImage(args = {}) {
   };
 
   const shapeMeta = args.shapeMeta && typeof args.shapeMeta === 'object' ? { ...args.shapeMeta } : {};
+  const explicitSourceShapeId = nonEmptyString(args.sourceShapeId);
+  const lineageSourceShapeId =
+    holderLineage?.sourceShapeId ||
+    explicitSourceShapeId ||
+    (!holderAnchor ? anchorShapeId : null);
+  const lineageBranchLabel =
+    holderLineage?.branchLabel ||
+    nonEmptyString(args.branchLabel) ||
+    nonEmptyString(shapeMeta.branchLabel) ||
+    nonEmptyString(shapeMeta.imageAgentBranchLabel);
+  const lineagePromptCardId =
+    holderLineage?.promptCardId ||
+    nonEmptyString(args.promptCardId) ||
+    nonEmptyString(shapeMeta.promptCardId) ||
+    nonEmptyString(shapeMeta.imageAgentPromptCardId);
+  const lineageArrowId =
+    holderLineage?.arrowId ||
+    nonEmptyString(args.arrowId) ||
+    nonEmptyString(shapeMeta.arrowId) ||
+    nonEmptyString(shapeMeta.imageAgentArrowId);
+  const promptText = nonEmptyString(args.prompt) || holderLineage?.prompt || nonEmptyString(shapeMeta.prompt);
   if (holderAnchor && !shapeMeta.imageAgentGeneratedForAiImageHolder) {
     shapeMeta.imageAgentGeneratedForAiImageHolder = anchorShapeId;
   }
-  if (anchorShapeId && !shapeMeta.imageAgentSourceShapeId) {
-    shapeMeta.imageAgentSourceShapeId = anchorShapeId;
+  if (holderAnchor && !shapeMeta.imageAgentHolderShapeId) {
+    shapeMeta.imageAgentHolderShapeId = anchorShapeId;
   }
-  if (nonEmptyString(args.prompt) && !shapeMeta.prompt) {
-    shapeMeta.prompt = nonEmptyString(args.prompt);
+  if (lineageSourceShapeId && !shapeMeta.imageAgentSourceShapeId) {
+    shapeMeta.imageAgentSourceShapeId = lineageSourceShapeId;
+  }
+  if (lineageSourceShapeId && !shapeMeta.sourceShapeId) {
+    shapeMeta.sourceShapeId = lineageSourceShapeId;
+  }
+  if (holderAnchor && !shapeMeta.targetShapeId) {
+    shapeMeta.targetShapeId = anchorShapeId;
+  }
+  if (holderAnchor && !shapeMeta.imageAgentTargetShapeId) {
+    shapeMeta.imageAgentTargetShapeId = anchorShapeId;
+  }
+  if (lineageBranchLabel && !shapeMeta.branchLabel) {
+    shapeMeta.branchLabel = lineageBranchLabel;
+  }
+  if (lineageBranchLabel && !shapeMeta.imageAgentBranchLabel) {
+    shapeMeta.imageAgentBranchLabel = lineageBranchLabel;
+  }
+  if (lineageBranchLabel && !shapeMeta.imageAgentBranchResult) {
+    shapeMeta.imageAgentBranchResult = true;
+  }
+  if (lineagePromptCardId && !shapeMeta.promptCardId) {
+    shapeMeta.promptCardId = lineagePromptCardId;
+  }
+  if (lineagePromptCardId && !shapeMeta.imageAgentPromptCardId) {
+    shapeMeta.imageAgentPromptCardId = lineagePromptCardId;
+  }
+  if (lineageArrowId && !shapeMeta.arrowId) {
+    shapeMeta.arrowId = lineageArrowId;
+  }
+  if (lineageArrowId && !shapeMeta.imageAgentArrowId) {
+    shapeMeta.imageAgentArrowId = lineageArrowId;
+  }
+  if (promptText && !shapeMeta.prompt) {
+    shapeMeta.prompt = promptText;
   }
 
   const shapeRecord = {
@@ -1124,6 +1198,7 @@ async function createCanvasBranch(args = {}) {
   const holderId = uniqueRecordId(store, 'shape', `${branchLabel}-branch-holder`);
   const prompt = compactText(args.prompt);
   const createdAt = new Date().toISOString();
+  const operationType = nonEmptyString(args.operationType) || 'derivative';
 
   if (!sourceShape.meta?.branchLabel && !sourceShape.meta?.imageAgentBranchLabel) {
     sourceShape.meta = {
@@ -1148,7 +1223,7 @@ async function createCanvasBranch(args = {}) {
       createdAt,
       branchLabel,
       imageAgentBranchLabel: branchLabel,
-      operationType: nonEmptyString(args.operationType) || 'derivative'
+      operationType
     },
     id: holderId,
     type: 'frame',
@@ -1172,7 +1247,10 @@ async function createCanvasBranch(args = {}) {
     targetShapeId: holderId,
     start: sourceCenter,
     end: targetCenter,
-    label: branchLabel
+    label: branchLabel,
+    meta: {
+      operationType
+    }
   });
   store[arrowId] = arrowRecord;
 
@@ -1194,11 +1272,33 @@ async function createCanvasBranch(args = {}) {
         imageAgentBranchPrompt: true,
         sourceShapeId,
         targetShapeId: holderId,
+        arrowId,
+        operationType,
         branchLabel
       }
     });
     promptCardId = card.shapeId;
     store[card.shapeId] = card.record;
+  }
+
+  store[holderId].meta = {
+    ...(store[holderId].meta ?? {}),
+    arrowId,
+    imageAgentArrowId: arrowId,
+    promptCardId,
+    imageAgentPromptCardId: promptCardId
+  };
+  store[arrowId].meta = {
+    ...(store[arrowId].meta ?? {}),
+    promptCardId,
+    imageAgentPromptCardId: promptCardId
+  };
+  if (promptCardId) {
+    store[promptCardId].meta = {
+      ...(store[promptCardId].meta ?? {}),
+      arrowId,
+      imageAgentArrowId: arrowId
+    };
   }
 
   await saveCanvasSnapshot(canvasUrl, snapshot);
@@ -1315,8 +1415,11 @@ async function readCanvasLayers(args = {}) {
       asset: shape.props?.assetId ? snapshot.store[shape.props.assetId] ?? null : null,
       links: {
         sourceShapeId: shape.meta?.sourceShapeId ?? shape.meta?.imageAgentSourceShapeId ?? null,
-        targetShapeId: shape.meta?.targetShapeId ?? null,
-        branchLabel: shape.meta?.branchLabel ?? shape.meta?.imageAgentBranchLabel ?? null
+        targetShapeId: shape.meta?.targetShapeId ?? shape.meta?.imageAgentTargetShapeId ?? null,
+        holderShapeId: shape.meta?.imageAgentHolderShapeId ?? null,
+        branchLabel: shape.meta?.branchLabel ?? shape.meta?.imageAgentBranchLabel ?? null,
+        promptCardId: shape.meta?.promptCardId ?? shape.meta?.imageAgentPromptCardId ?? null,
+        arrowId: shape.meta?.arrowId ?? shape.meta?.imageAgentArrowId ?? null
       },
       meta: shape.meta ?? null,
       props: shape.props ?? null
@@ -1391,6 +1494,7 @@ function toolDefinitions() {
           pageId: { type: 'string' },
           anchorShapeId: { type: 'string' },
           targetId: { type: 'string' },
+          targetShapeId: { type: 'string' },
           sourceShapeId: { type: 'string' },
           fileName: { type: 'string' },
           placement: { type: 'string', enum: ['right', 'left', 'below'] },
@@ -1401,6 +1505,9 @@ function toolDefinitions() {
           width: { type: 'number' },
           height: { type: 'number' },
           prompt: { type: 'string' },
+          branchLabel: { type: 'string' },
+          promptCardId: { type: 'string' },
+          arrowId: { type: 'string' },
           altText: { type: 'string' },
           shapeMeta: { type: 'object' },
           assetMeta: { type: 'object' },
