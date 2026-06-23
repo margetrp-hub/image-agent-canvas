@@ -1,0 +1,28 @@
+node_modules/
+dist/
+
+# Project-local runtime data and generated assets
+canvas/
+*.iacanvas.json
+generated-images/
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+.secrets/
+**/.secrets/
+*secret*
+*apikey*
+*api-key*
+
+# Logs and OS/editor files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

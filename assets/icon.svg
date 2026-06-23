@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="图片插件 icon">
+  <rect width="128" height="128" rx="28" fill="#0f172a"/>
+  <path d="M29 35c0-6.075 4.925-11 11-11h48c6.075 0 11 4.925 11 11v58c0 6.075-4.925 11-11 11H40c-6.075 0-11-4.925-11-11V35Z" fill="#eff6ff"/>
+  <path d="M42 81l15-18 13 13 10-12 8 17H42Z" fill="#2563eb"/>
+  <circle cx="51" cy="48" r="8" fill="#f97316"/>
+  <path d="M78 31l20-10-8 21 19 9-22 5-4 22-12-19-23 3 16-16-9-21 23 6Z" fill="#22c55e"/>
+</svg>

@@ -1,0 +1,23 @@
+{
+  "name": "image-agent-canvas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Codex-first multimodal canvas plugin for controllable image generation workflows.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "mcp": "node mcp/server.mjs",
+    "check": "node --check mcp/server.mjs && node scripts/smoke-contracts.mjs",
+    "validate:plugin": "C:/Users/Administrator/AppData/Local/Python/bin/python.exe C:/Users/Administrator/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py C:/Users/Administrator/plugins/image-agent-canvas"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "fractional-indexing": "^3.2.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tldraw": "^5.1.1",
+    "vite": "^8.0.16"
+  },
+  "devDependencies": {}
+}

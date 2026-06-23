@@ -1,0 +1,43 @@
+{
+  "name": "image-agent-canvas",
+  "version": "0.1.0+codex.20260622093301",
+  "description": "A Codex-first multimodal canvas for controllable image generation workflows.",
+  "author": {
+    "name": "margetrp-hub",
+    "url": "https://github.com/margetrp-hub"
+  },
+  "homepage": "https://github.com/margetrp-hub/image-agent-canvas",
+  "repository": "https://github.com/margetrp-hub/image-agent-canvas",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "multimodal-canvas",
+    "image-generation",
+    "tldraw",
+    "prompt-workflow"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "图片插件",
+    "shortDescription": "用于参考图、标注、提示词和生图结果回填的项目内图片工作区。",
+    "longDescription": "使用本地 tldraw 工作区保存参考图、标注、提示词和生成结果。Codex 可以启动服务、读取选中图片或占位框、创建 AI 图片占位框，并把生成的本地图片插回工作区。",
+    "developerName": "margetrp-hub",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "MCP",
+      "Canvas",
+      "Vision",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Start 图片插件 for this project.",
+      "Use $image-agent-canvas:image-agent-image-gen to generate a new image into the selected 图片插件 holder.",
+      "Use my annotation screenshot to create a clean revised image beside the original."
+    ],
+    "brandColor": "#2563EB",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/logo.svg"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "image-agent-canvas": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "./scripts/start-mcp.ps1"
+      ],
+      "cwd": "."
+    }
+  }
+}

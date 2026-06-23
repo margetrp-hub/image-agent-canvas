@@ -1,0 +1,7 @@
+interface:
+  display_name: "Image Agent Image Gen"
+  short_description: "Generate an image into Image Agent Canvas"
+  default_prompt: "Use $image-agent-canvas:image-agent-image-gen to generate an image and place it into the selected Image Agent Canvas holder or current canvas area."
+
+policy:
+  allow_implicit_invocation: true
