@@ -142,7 +142,15 @@ const UI_TEXT = {
     modelLabel: '模型',
     sourceLabel: '来源',
     branchLabel: '分支',
-    holderLabel: '占位框'
+    holderLabel: '占位框',
+    compare: '对比',
+    compareView: '对比视图',
+    compareMode: '对比模式',
+    compareSlider: '滑杆',
+    compareSideBySide: '并排',
+    beforeImage: '来源图',
+    afterImage: '结果图',
+    resultLabel: '结果'
   },
   en: {
     localeLabel: 'Language',
@@ -232,7 +240,15 @@ const UI_TEXT = {
     modelLabel: 'Model',
     sourceLabel: 'Source',
     branchLabel: 'Branch',
-    holderLabel: 'Holder'
+    holderLabel: 'Holder',
+    compare: 'Compare',
+    compareView: 'Compare view',
+    compareMode: 'Compare mode',
+    compareSlider: 'Slider',
+    compareSideBySide: 'Side by side',
+    beforeImage: 'Source image',
+    afterImage: 'Result image',
+    resultLabel: 'Result'
   }
 };
 
@@ -1064,6 +1080,23 @@ function isGeneratedImageShape(shape, asset) {
   );
 }
 
+function getImageShapeRecord(store, shapeId) {
+  const shape = store?.[shapeId];
+  if (shape?.typeName !== 'shape' || shape.type !== 'image') return null;
+  const asset = store[shape.props?.assetId];
+  if (!asset?.props?.src) return null;
+  const parent = store[shape.parentId];
+  return {
+    id: shape.id,
+    assetId: shape.props?.assetId || '',
+    src: asset.props.src,
+    title: getShapeTitle(parent) || asset.props.name || shape.id,
+    fileName: asset.props.name || `${shape.id.replace(/^shape:/, '')}.png`,
+    width: asset.props.w || shape.props?.w || null,
+    height: asset.props.h || shape.props?.h || null
+  };
+}
+
 function toGeneratedImageRecords(snapshot) {
   const store = snapshot?.store || {};
   return Object.values(store)
@@ -1080,6 +1113,8 @@ function toGeneratedImageRecords(snapshot) {
         asset?.props?.name ||
         shape.id;
       const branchLabel = meta.branchLabel || meta.imageAgentBranchLabel || '';
+      const sourceShapeId = meta.sourceShapeId || meta.imageAgentSourceShapeId || '';
+      const sourceImage = getImageShapeRecord(store, sourceShapeId);
       return {
         id: shape.id,
         assetId: shape.props?.assetId || '',
@@ -1090,7 +1125,8 @@ function toGeneratedImageRecords(snapshot) {
         prompt: escapePromptCardText(meta.prompt),
         model: meta.imageAgentGenerationModel || asset.meta?.imageAgentGenerationModel || '',
         mode: meta.imageAgentGenerationMode || asset.meta?.imageAgentGenerationMode || '',
-        sourceShapeId: meta.sourceShapeId || meta.imageAgentSourceShapeId || '',
+        sourceShapeId,
+        sourceImage,
         targetShapeId: meta.targetShapeId || meta.imageAgentTargetShapeId || '',
         promptCardId: meta.promptCardId || meta.imageAgentPromptCardId || '',
         arrowId: meta.arrowId || meta.imageAgentArrowId || '',
@@ -1952,6 +1988,9 @@ function InspirationDrawer({ labels, locale, setLocale }) {
 function GeneratedImageHistory({ labels, snapshot, refreshCanvas }) {
   const [isOpen, setIsOpen] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [compareRecord, setCompareRecord] = useState(null);
+  const [compareMode, setCompareMode] = useState('slider');
+  const [comparePercent, setComparePercent] = useState(50);
   const [copiedPromptId, setCopiedPromptId] = useState('');
   const [copyFailedId, setCopyFailedId] = useState('');
   const records = useMemo(() => toGeneratedImageRecords(snapshot), [snapshot]);
@@ -1972,6 +2011,14 @@ function GeneratedImageHistory({ labels, snapshot, refreshCanvas }) {
     }, 1400);
   }, []);
 
+  const openCompare = useCallback((record) => {
+    if (!record?.sourceImage?.src) return;
+    setPreview(null);
+    setCompareRecord(record);
+    setCompareMode('slider');
+    setComparePercent(50);
+  }, []);
+
   useEffect(() => {
     if (!preview) return undefined;
     const handleKeyDown = (event) => {
@@ -1980,6 +2027,30 @@ function GeneratedImageHistory({ labels, snapshot, refreshCanvas }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [preview]);
+
+  useEffect(() => {
+    if (!compareRecord) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setCompareRecord(null);
+        return;
+      }
+
+      if (compareMode !== 'slider') return;
+      if (event.key === 'Home') {
+        event.preventDefault();
+        setComparePercent(0);
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        setComparePercent(100);
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        setComparePercent((value) => Math.max(0, Math.min(100, value + (event.key === 'ArrowLeft' ? -5 : 5))));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [compareMode, compareRecord]);
 
   return (
     <aside className={`iac-history ${isOpen ? 'open' : 'closed'}`} aria-label={labels.historyAria}>
@@ -2024,6 +2095,7 @@ function GeneratedImageHistory({ labels, snapshot, refreshCanvas }) {
                     <p>{record.prompt || labels.noPrompt}</p>
                     <div className="iac-history-actions">
                       <button type="button" onClick={() => setPreview(record)}>{labels.previewImage}</button>
+                      {record.sourceImage ? <button type="button" onClick={() => openCompare(record)}>{labels.compare}</button> : null}
                       <button type="button" onClick={() => copyPrompt(record)} disabled={!record.prompt}>{promptCopyLabel}</button>
                       <a href={record.src} download={normalizeDownloadName(record.fileName)}>{labels.download}</a>
                     </div>
@@ -2057,10 +2129,88 @@ function GeneratedImageHistory({ labels, snapshot, refreshCanvas }) {
                 {preview.promptCardId ? <span>{labels.promptCard}: {preview.promptCardId}</span> : null}
               </div>
               <div className="iac-history-preview-actions">
+                {preview.sourceImage ? <button type="button" onClick={() => openCompare(preview)}>{labels.compare}</button> : null}
                 <button type="button" onClick={() => copyPrompt(preview)} disabled={!preview.prompt}>
                   {copiedPromptId === preview.id ? labels.copiedPrompt : labels.copyPrompt}
                 </button>
                 <a href={preview.src} download={normalizeDownloadName(preview.fileName)}>{labels.download}</a>
+              </div>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+      {compareRecord ? (
+        <div className="iac-history-preview iac-compare-preview" role="dialog" aria-modal="true" aria-label={`${labels.compareView} ${compareRecord.title}`}>
+          <section>
+            <header>
+              <div className="iac-preview-title">
+                <strong>{labels.compareView}</strong>
+                <span>{compareRecord.title}</span>
+              </div>
+              <div className="iac-compare-header-actions">
+                <div className="iac-compare-tabs" role="tablist" aria-label={labels.compareMode}>
+                  <button
+                    type="button"
+                    className={compareMode === 'slider' ? 'active' : ''}
+                    onClick={() => setCompareMode('slider')}
+                    aria-selected={compareMode === 'slider'}
+                  >
+                    {labels.compareSlider}
+                  </button>
+                  <button
+                    type="button"
+                    className={compareMode === 'side' ? 'active' : ''}
+                    onClick={() => setCompareMode('side')}
+                    aria-selected={compareMode === 'side'}
+                  >
+                    {labels.compareSideBySide}
+                  </button>
+                </div>
+                <button className="iac-icon-button" type="button" onClick={() => setCompareRecord(null)} title={labels.close} aria-label={labels.close}>
+                  <CloseIcon />
+                </button>
+              </div>
+            </header>
+            <div className="iac-compare-body">
+              {compareMode === 'slider' ? (
+                <div className="iac-compare-slider" style={{ '--iac-compare-percent': `${comparePercent}%` }}>
+                  <img className="iac-compare-base" src={compareRecord.sourceImage.src} alt={compareRecord.sourceImage.title} />
+                  <div className="iac-compare-after" aria-hidden="true">
+                    <img src={compareRecord.src} alt="" />
+                  </div>
+                  <span className="iac-compare-badge iac-compare-badge-before">{labels.beforeImage}</span>
+                  <span className="iac-compare-badge iac-compare-badge-after">{labels.afterImage}</span>
+                  <div className="iac-compare-divider" aria-hidden="true" />
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={comparePercent}
+                    aria-label={labels.compareSlider}
+                    onChange={(event) => setComparePercent(Number(event.target.value))}
+                  />
+                </div>
+              ) : (
+                <div className="iac-compare-side">
+                  <figure>
+                    <figcaption>{labels.beforeImage}</figcaption>
+                    <img src={compareRecord.sourceImage.src} alt={compareRecord.sourceImage.title} />
+                  </figure>
+                  <figure>
+                    <figcaption>{labels.afterImage}</figcaption>
+                    <img src={compareRecord.src} alt={compareRecord.title} />
+                  </figure>
+                </div>
+              )}
+            </div>
+            <footer>
+              <div>
+                <span>{labels.sourceLabel}: {compareRecord.sourceImage.title}</span>
+                <span>{labels.resultLabel}: {[compareRecord.branchLabel, compareRecord.model, compareRecord.mode].filter(Boolean).join(' / ') || compareRecord.id}</span>
+              </div>
+              <div className="iac-history-preview-actions">
+                <button type="button" onClick={() => { setCompareRecord(null); setPreview(compareRecord); }}>{labels.previewImage}</button>
+                <a href={compareRecord.src} download={normalizeDownloadName(compareRecord.fileName)}>{labels.download}</a>
               </div>
             </footer>
           </section>
