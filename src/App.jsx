@@ -128,7 +128,21 @@ const UI_TEXT = {
     loadCanvasFailed: '图片插件文件加载失败。',
     skippedRecordsTitle: (count) => `已跳过 ${count} 条异常画布记录`,
     skippedRecordsCopy: '可用内容已正常加载。',
-    details: '详情'
+    details: '详情',
+    historyAria: '生成记录',
+    history: '记录',
+    generationHistory: '生成记录',
+    generationHistorySubtitle: (count) => `${count} 张生成图`,
+    refresh: '刷新',
+    noGeneratedImages: '画布里还没有生成图。',
+    previewImage: '查看大图',
+    download: '下载',
+    copiedPrompt: '已复制提示词',
+    copyPromptFailed: '复制失败',
+    modelLabel: '模型',
+    sourceLabel: '来源',
+    branchLabel: '分支',
+    holderLabel: '占位框'
   },
   en: {
     localeLabel: 'Language',
@@ -204,7 +218,21 @@ const UI_TEXT = {
     loadCanvasFailed: 'Image plugin file could not be loaded.',
     skippedRecordsTitle: (count) => `Skipped ${count} invalid canvas record${count === 1 ? '' : 's'}.`,
     skippedRecordsCopy: 'Valid content was loaded.',
-    details: 'Details'
+    details: 'Details',
+    historyAria: 'Generation history',
+    history: 'History',
+    generationHistory: 'Generation history',
+    generationHistorySubtitle: (count) => `${count} generated image${count === 1 ? '' : 's'}`,
+    refresh: 'Refresh',
+    noGeneratedImages: 'No generated images on the canvas yet.',
+    previewImage: 'Preview image',
+    download: 'Download',
+    copiedPrompt: 'Prompt copied',
+    copyPromptFailed: 'Copy failed',
+    modelLabel: 'Model',
+    sourceLabel: 'Source',
+    branchLabel: 'Branch',
+    holderLabel: 'Holder'
   }
 };
 
@@ -1001,6 +1029,85 @@ function getItemSourceLabel(item, locale) {
 
 function getItemImageAlt(item, locale, fallback = '') {
   return localizedValue(item?.imageAltText, locale) || localizedValue(item?.imageAlt, locale) || fallback;
+}
+
+function getRichTextPlainText(richText) {
+  if (!richText?.content) return '';
+  const lines = [];
+  for (const block of richText.content) {
+    const text = (block.content || [])
+      .map((entry) => entry.text || '')
+      .join('')
+      .trim();
+    if (text) lines.push(text);
+  }
+  return lines.join('\n').trim();
+}
+
+function getShapeTitle(shape, fallback = '') {
+  return (
+    shape?.props?.name ||
+    shape?.props?.text ||
+    getRichTextPlainText(shape?.props?.richText) ||
+    fallback
+  );
+}
+
+function isGeneratedImageShape(shape, asset) {
+  if (shape?.type !== 'image' || !asset?.props?.src) return false;
+  return (
+    shape.meta?.imageAgentGeneratedAsset === true ||
+    shape.meta?.imageAgentGenerationMode ||
+    shape.meta?.imageAgentTestFlow === true ||
+    asset.meta?.imageAgentGeneratedAsset === true ||
+    asset.meta?.imageAgentGenerationMode
+  );
+}
+
+function toGeneratedImageRecords(snapshot) {
+  const store = snapshot?.store || {};
+  return Object.values(store)
+    .filter((record) => record?.typeName === 'shape' && record.type === 'image')
+    .map((shape) => {
+      const asset = store[shape.props?.assetId];
+      if (!isGeneratedImageShape(shape, asset)) return null;
+      const parent = store[shape.parentId];
+      const meta = { ...(asset?.meta || {}), ...(shape.meta || {}) };
+      const title =
+        getShapeTitle(parent) ||
+        meta.branchLabel ||
+        meta.imageAgentBranchLabel ||
+        asset?.props?.name ||
+        shape.id;
+      const branchLabel = meta.branchLabel || meta.imageAgentBranchLabel || '';
+      return {
+        id: shape.id,
+        assetId: shape.props?.assetId || '',
+        src: asset.props.src,
+        title,
+        branchLabel,
+        holderTitle: getShapeTitle(parent),
+        prompt: escapePromptCardText(meta.prompt),
+        model: meta.imageAgentGenerationModel || asset.meta?.imageAgentGenerationModel || '',
+        mode: meta.imageAgentGenerationMode || asset.meta?.imageAgentGenerationMode || '',
+        sourceShapeId: meta.sourceShapeId || meta.imageAgentSourceShapeId || '',
+        targetShapeId: meta.targetShapeId || meta.imageAgentTargetShapeId || '',
+        promptCardId: meta.promptCardId || meta.imageAgentPromptCardId || '',
+        arrowId: meta.arrowId || meta.imageAgentArrowId || '',
+        fileName: asset.props.name || `${shape.id.replace(/^shape:/, '')}.png`,
+        width: asset.props.w || shape.props?.w || null,
+        height: asset.props.h || shape.props?.h || null,
+        fileSize: asset.props.fileSize || null,
+        zIndex: shape.index || ''
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(b.zIndex).localeCompare(String(a.zIndex)));
+}
+
+function normalizeDownloadName(name, fallback = 'image.png') {
+  const value = String(name || fallback).replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-').trim();
+  return value || fallback;
 }
 
 async function blobToPngBlob(blob) {
@@ -1842,6 +1949,127 @@ function InspirationDrawer({ labels, locale, setLocale }) {
   );
 }
 
+function GeneratedImageHistory({ labels, snapshot, refreshCanvas }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [copiedPromptId, setCopiedPromptId] = useState('');
+  const [copyFailedId, setCopyFailedId] = useState('');
+  const records = useMemo(() => toGeneratedImageRecords(snapshot), [snapshot]);
+
+  const copyPrompt = useCallback(async (record) => {
+    if (!record?.prompt) return;
+    try {
+      await navigator.clipboard?.writeText(record.prompt);
+      setCopiedPromptId(record.id);
+      setCopyFailedId('');
+    } catch (error) {
+      setCopyFailedId(record.id);
+      setCopiedPromptId('');
+    }
+    window.setTimeout(() => {
+      setCopiedPromptId('');
+      setCopyFailedId('');
+    }, 1400);
+  }, []);
+
+  useEffect(() => {
+    if (!preview) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setPreview(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [preview]);
+
+  return (
+    <aside className={`iac-history ${isOpen ? 'open' : 'closed'}`} aria-label={labels.historyAria}>
+      <button className="iac-history-toggle" type="button" onClick={() => setIsOpen((value) => !value)}>
+        <span>{labels.history}</span>
+        <strong>{records.length}</strong>
+      </button>
+      {isOpen ? (
+        <section className="iac-history-panel">
+          <header>
+            <div>
+              <strong>{labels.generationHistory}</strong>
+              <span>{labels.generationHistorySubtitle(records.length)}</span>
+            </div>
+            <div className="iac-history-header-actions">
+              <button type="button" onClick={refreshCanvas}>{labels.refresh}</button>
+              <button className="iac-icon-button" type="button" onClick={() => setIsOpen(false)} title={labels.close} aria-label={labels.close}>
+                <CloseIcon />
+              </button>
+            </div>
+          </header>
+          <div className="iac-history-list">
+            {records.length === 0 ? <p className="iac-history-empty">{labels.noGeneratedImages}</p> : null}
+            {records.map((record) => {
+              const promptCopyLabel = copyFailedId === record.id
+                ? labels.copyPromptFailed
+                : copiedPromptId === record.id
+                  ? labels.copiedPrompt
+                  : labels.copyPrompt;
+              return (
+                <article className="iac-history-card" key={record.id}>
+                  <button type="button" className="iac-history-thumb" onClick={() => setPreview(record)} aria-label={`${labels.previewImage} ${record.title}`}>
+                    <img src={record.src} alt={record.title} />
+                  </button>
+                  <div className="iac-history-body">
+                    <strong>{record.title}</strong>
+                    <div className="iac-history-meta">
+                      {record.branchLabel ? <span>{labels.branchLabel}: {record.branchLabel}</span> : null}
+                      {record.model ? <span>{labels.modelLabel}: {record.model}</span> : null}
+                      {record.sourceShapeId ? <span>{labels.sourceLabel}: {record.sourceShapeId.replace(/^shape:/, '')}</span> : null}
+                    </div>
+                    <p>{record.prompt || labels.noPrompt}</p>
+                    <div className="iac-history-actions">
+                      <button type="button" onClick={() => setPreview(record)}>{labels.previewImage}</button>
+                      <button type="button" onClick={() => copyPrompt(record)} disabled={!record.prompt}>{promptCopyLabel}</button>
+                      <a href={record.src} download={normalizeDownloadName(record.fileName)}>{labels.download}</a>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+      {preview ? (
+        <div className="iac-history-preview" role="dialog" aria-modal="true" aria-label={preview.title}>
+          <section>
+            <header>
+              <div className="iac-preview-title">
+                <strong>{preview.title}</strong>
+                <span>
+                  {[preview.branchLabel, preview.model, preview.mode].filter(Boolean).join(' / ') || labels.image}
+                </span>
+              </div>
+              <button className="iac-icon-button" type="button" onClick={() => setPreview(null)} title={labels.close} aria-label={labels.close}>
+                <CloseIcon />
+              </button>
+            </header>
+            <div className="iac-history-preview-image">
+              <img src={preview.src} alt={preview.title} />
+            </div>
+            <footer>
+              <div>
+                {preview.sourceShapeId ? <span>{labels.sourceLabel}: {preview.sourceShapeId}</span> : null}
+                {preview.promptCardId ? <span>{labels.promptCard}: {preview.promptCardId}</span> : null}
+              </div>
+              <div className="iac-history-preview-actions">
+                <button type="button" onClick={() => copyPrompt(preview)} disabled={!preview.prompt}>
+                  {copiedPromptId === preview.id ? labels.copiedPrompt : labels.copyPrompt}
+                </button>
+                <a href={preview.src} download={normalizeDownloadName(preview.fileName)}>{labels.download}</a>
+              </div>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+    </aside>
+  );
+}
+
 export default function App() {
   const [locale, setLocale] = useState(readInitialLocale);
   const [snapshot, setSnapshot] = useState();
@@ -1886,6 +2114,25 @@ export default function App() {
 
     loadCanvas();
     return () => controller.abort();
+  }, []);
+
+  const refreshCanvas = useCallback(async () => {
+    try {
+      const [canvasResponse, viewStateResponse] = await Promise.all([
+        fetch(CANVAS_ENDPOINT),
+        fetch(VIEW_STATE_ENDPOINT)
+      ]);
+      if (!canvasResponse.ok) throw new Error(`Failed to refresh canvas: ${canvasResponse.status}`);
+      if (!viewStateResponse.ok) throw new Error(`Failed to refresh canvas view state: ${viewStateResponse.status}`);
+
+      const [canvasData, viewStateData] = await Promise.all([canvasResponse.json(), viewStateResponse.json()]);
+      const sanitized = sanitizeCanvasSnapshotForTldraw(canvasData.snapshot);
+      setSnapshot(sanitized.snapshot);
+      setSkippedRecords(sanitized.skippedRecords);
+      setViewState(viewStateData.viewState ?? null);
+    } catch (error) {
+      console.error(error);
+    }
   }, []);
 
   const handleMount = useCallback((editor) => {
@@ -2104,6 +2351,7 @@ export default function App() {
         components={imageAgentComponents}
       />
       <InspirationDrawer labels={labels} locale={locale} setLocale={setLocale} />
+      <GeneratedImageHistory labels={labels} snapshot={snapshot} refreshCanvas={refreshCanvas} />
       <GenerationSetupModal labels={labels} />
     </main>
   );
