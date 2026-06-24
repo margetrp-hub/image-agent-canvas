@@ -165,20 +165,21 @@ Fill these fields in the first-run setup modal or settings panel:
 | --- | --- |
 | Base URL | API 根地址，例如 `https://example.com/v1`。API root URL, for example `https://example.com/v1`. |
 | Model | 图片模型名，例如 `gpt-image-2`。Image model name, for example `gpt-image-2`. |
+| Size | 生成尺寸，可选 `1024x1024`、`1536x1024`、`1024x1536`。Generation size, one of `1024x1024`, `1536x1024`, `1024x1536`. |
 | Env key | 环境变量名，例如 `OPENAI_API_KEY`。Environment variable name, for example `OPENAI_API_KEY`. |
 | Secret key | 真实 API key，本地保存。The real API key, stored locally. |
 
 工作方式：
 
-1. 图片插件保存模式、Base URL、模型名和本地密钥引用。
-2. Codex 读取这些设置，调用图片 API 生成真实 bitmap。
+1. 图片插件保存模式、尺寸、Base URL、模型名和本地密钥引用。
+2. Codex 读取这些设置，按所选尺寸调用图片 API 生成真实 bitmap。
 3. 生成结果保存到 `canvas/generated-images/`。
 4. 图片插件通过 `insert_canvas_image` 把该图片插入当前画布或选中的占位框。
 
 How it works:
 
-1. The plugin saves the mode, Base URL, model name, and local secret reference.
-2. Codex reads those settings and calls the image API to generate a real bitmap.
+1. The plugin saves the mode, size, Base URL, model name, and local secret reference.
+2. Codex reads those settings and calls the image API with the selected size to generate a real bitmap.
 3. The generated file is saved under `canvas/generated-images/`.
 4. The plugin inserts the bitmap into the current canvas or selected holder with
    `insert_canvas_image`.

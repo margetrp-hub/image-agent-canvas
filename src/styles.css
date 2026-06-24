@@ -282,7 +282,8 @@ body {
 }
 
 .iac-generation-panel button,
-.iac-generation-panel input {
+.iac-generation-panel input,
+.iac-generation-panel select {
   font: inherit;
 }
 
@@ -356,7 +357,8 @@ body {
   font-weight: 800;
 }
 
-.iac-generation-panel input {
+.iac-generation-panel input,
+.iac-generation-panel select {
   min-width: 0;
   height: 36px;
   padding: 0 10px;
@@ -364,6 +366,13 @@ body {
   background: #f9fbfd;
   border: 1px solid #d8e0eb;
   border-radius: 10px;
+}
+
+.iac-generation-size {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
 }
 
 .iac-generation-panel footer {
@@ -478,7 +487,8 @@ body {
   font-weight: 800;
 }
 
-.iac-setup-fields input {
+.iac-setup-fields input,
+.iac-setup-size select {
   min-width: 0;
   height: 36px;
   padding: 0 10px;
@@ -486,6 +496,17 @@ body {
   background: #f9fbfd;
   border: 1px solid #d8e0eb;
   border-radius: 10px;
+}
+
+.iac-setup-size {
+  display: grid;
+  gap: 5px;
+}
+
+.iac-setup-size span {
+  color: #536174;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .iac-setup-dialog footer {
@@ -1227,9 +1248,11 @@ body {
 .iac-history-list {
   display: grid;
   gap: 10px;
+  width: 100%;
   max-height: calc(100vh - 190px);
   padding: 12px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .iac-history-empty {
@@ -1243,6 +1266,8 @@ body {
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr);
   gap: 10px;
+  max-width: 100%;
+  min-width: 0;
   min-height: 132px;
   padding: 8px;
   background: #ffffff;
@@ -1323,10 +1348,10 @@ body {
 }
 
 .iac-history-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
   gap: 6px;
-  align-items: center;
+  min-width: 0;
 }
 
 .iac-history-actions button,
@@ -1335,14 +1360,25 @@ body {
 .iac-history-preview-actions a {
   min-height: 28px;
   padding: 0 9px;
+  align-items: center;
   color: #1f5eff;
+  display: inline-flex;
   font-size: 12px;
   font-weight: 800;
+  justify-content: center;
+  min-width: 0;
   text-decoration: none;
+  text-align: center;
+  white-space: nowrap;
   cursor: pointer;
   background: #eef4ff;
   border: 1px solid #d6e4ff;
   border-radius: 6px;
+}
+
+.iac-history-actions button,
+.iac-history-actions a {
+  width: 100%;
 }
 
 .iac-history-actions button[disabled],

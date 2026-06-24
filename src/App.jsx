@@ -42,9 +42,11 @@ const ANNOTATION_DEFAULT_H = 96;
 const ANNOTATION_NOTE_OFFSET_X = 88;
 const ANNOTATION_NOTE_OFFSET_Y = 56;
 const LOCALE_STORAGE_KEY = 'image-plugin-locale';
+const GENERATION_SIZE_OPTIONS = ['1024x1024', '1536x1024', '1024x1536'];
 const DEFAULT_GENERATION_SETTINGS = {
   setupComplete: false,
   mode: 'builtin',
+  size: '1024x1024',
   api: {
     baseUrl: '',
     model: 'gpt-image-2',
@@ -64,6 +66,7 @@ const UI_TEXT = {
     api: 'API',
     hide: '收起',
     key: '密钥',
+    imageSize: '尺寸',
     baseUrl: 'Base URL',
     model: '模型',
     envKey: '环境变量名',
@@ -162,6 +165,7 @@ const UI_TEXT = {
     api: 'API',
     hide: 'Hide',
     key: 'Key',
+    imageSize: 'Size',
     baseUrl: 'Base URL',
     model: 'Model',
     envKey: 'Env key',
@@ -1241,10 +1245,12 @@ function CloseIcon() {
 }
 
 function normalizeGenerationSettings(value = {}) {
+  const size = GENERATION_SIZE_OPTIONS.includes(value.size) ? value.size : DEFAULT_GENERATION_SETTINGS.size;
   return {
     ...DEFAULT_GENERATION_SETTINGS,
     setupComplete: value.setupComplete === true,
     mode: value.mode === 'api' ? 'api' : 'builtin',
+    size,
     api: {
       ...DEFAULT_GENERATION_SETTINGS.api,
       ...(value.api || {})
@@ -1255,6 +1261,7 @@ function normalizeGenerationSettings(value = {}) {
 async function saveGenerationSettingsRequest(settings, apiKey = '') {
   const body = {
     mode: settings.mode,
+    size: settings.size,
     api: {
       baseUrl: settings.api.baseUrl,
       model: settings.api.model,
@@ -1328,6 +1335,22 @@ function GenerationSettingsPanel({ labels }) {
     setMessage('');
   }, []);
 
+  const updateSize = useCallback(async (size) => {
+    const nextSettings = { ...settings, size };
+    setSettings(nextSettings);
+    setMessage('');
+    setStatus('saving');
+    try {
+      const savedSettings = await saveGenerationSettingsRequest(nextSettings);
+      setSettings(savedSettings);
+      setStatus('ready');
+      setMessage(labels.saved);
+    } catch {
+      setStatus('error');
+      setMessage(labels.saveFailed);
+    }
+  }, [labels.saveFailed, labels.saved, settings]);
+
   const saveSettings = useCallback(async () => {
     setStatus('saving');
     setMessage('');
@@ -1351,6 +1374,7 @@ function GenerationSettingsPanel({ labels }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           mode: settings.mode,
+          size: settings.size,
           api: {
             baseUrl: settings.api.baseUrl,
             model: settings.api.model,
@@ -1394,6 +1418,12 @@ function GenerationSettingsPanel({ labels }) {
           </button>
         ) : null}
       </div>
+      <label className="iac-generation-size">
+        <span>{labels.imageSize}</span>
+        <select value={settings.size} onChange={(event) => updateSize(event.target.value)} disabled={status === 'saving'}>
+          {GENERATION_SIZE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+      </label>
       {settings.mode === 'api' && isExpanded ? (
         <div className="iac-generation-fields">
           <label>
@@ -1487,6 +1517,12 @@ function GenerationSetupModal({ labels }) {
     setMessage('');
   }, []);
 
+  const updateSize = useCallback((size) => {
+    setSettings((current) => ({ ...(current || DEFAULT_GENERATION_SETTINGS), size }));
+    setMessage('');
+    setStatus('ready');
+  }, []);
+
   const finishSetup = useCallback(async () => {
     if (!settings) return;
     setStatus('saving');
@@ -1529,6 +1565,12 @@ function GenerationSetupModal({ labels }) {
             <span>{labels.setupApiCopy}</span>
           </button>
         </div>
+        <label className="iac-setup-size">
+          <span>{labels.imageSize}</span>
+          <select value={settings.size} onChange={(event) => updateSize(event.target.value)}>
+            {GENERATION_SIZE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
         {settings.mode === 'api' ? (
           <div className="iac-setup-fields">
             <label>

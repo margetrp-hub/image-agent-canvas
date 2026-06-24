@@ -27,6 +27,7 @@ The required generation capability is the built-in `$imagegen` skill from Codex.
 3. Generate the bitmap with the built-in `$imagegen` skill unless the user explicitly requests another path.
 
    - Treat the user's request as a raster image generation request.
+   - Use the Image Plugin generation settings size as the default size preference: `1024x1024`, `1536x1024`, or `1024x1536`.
    - If the asset needs visible text, include that text directly in the image generation prompt.
    - Do not create SVG, HTML, or placeholder graphics when the user asked for an image.
    - Do not switch to CLI/API fallback unless the user explicitly asks for that path.

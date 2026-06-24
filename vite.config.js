@@ -21,6 +21,7 @@ const runtimeFile = join(canvasDir, 'image-agent-runtime.json');
 const generationSettingsFile = join(canvasDir, 'image-agent-generation-settings.json');
 const generationSecretsDir = join(canvasDir, '.secrets');
 const generationSecretFile = join(generationSecretsDir, 'image-agent-generation-secret.json');
+const generationSizeOptions = ['1024x1024', '1536x1024', '1024x1536'];
 const canvasPagesDir = join(canvasDir, 'pages');
 const canvasAssetsDir = join(canvasDir, 'assets');
 const canvasLibraryDir = join(canvasDir, 'library');
@@ -800,6 +801,7 @@ const defaultGenerationSettings = {
   version: 1,
   setupComplete: false,
   mode: 'builtin',
+  size: '1024x1024',
   api: {
     baseUrl: '',
     model: 'gpt-image-2',
@@ -811,11 +813,13 @@ const defaultGenerationSettings = {
 function normalizeGenerationSettings(value = {}) {
   value = value && typeof value === 'object' ? value : {};
   const mode = value.mode === 'api' ? 'api' : 'builtin';
+  const size = generationSizeOptions.includes(value.size) ? value.size : defaultGenerationSettings.size;
   const api = value.api && typeof value.api === 'object' ? value.api : {};
   return {
     ...defaultGenerationSettings,
     setupComplete: value.setupComplete === true,
     mode,
+    size,
     api: {
       ...defaultGenerationSettings.api,
       baseUrl: compactText(api.baseUrl, 1000),
