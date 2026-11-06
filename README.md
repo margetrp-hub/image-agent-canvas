@@ -10,6 +10,17 @@ and final generated bitmap assets inside the current project canvas.
 
 Reference project: https://github.com/zhongerxin/cowart
 
+## CI and releases
+
+Pull requests and pushes to `main` run a frozen dependency install, the MCP and
+plugin contract smoke check, and the production canvas build. The workflow also
+creates and verifies a plugin archive with SHA-256 checksums. Push a `vX.Y.Z` tag
+matching `package.json` to publish that tested archive and `SHA256SUMS` to GitHub
+Releases. A failed check stops publication; rerunning the same tag replaces its
+assets without deleting the release. Install locally with `npm ci` after extraction.
+
+The workflow never launches a user's canvas or calls an image provider.
+
 ## 功能 / Features
 
 - 启动本地 tldraw 无限画布，并把数据保存到当前项目。
